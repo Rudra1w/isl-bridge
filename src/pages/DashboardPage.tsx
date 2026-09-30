@@ -1,14 +1,14 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CameraPanel } from '@/components/dashboard/CameraPanel';
 import { TranslationPanel, RecognitionHistoryItem } from '@/components/dashboard/TranslationPanel';
 import { CommunicationPanel } from '@/components/dashboard/CommunicationPanel';
 import { BottomToolbar } from '@/components/dashboard/BottomToolbar';
 import { SettingsModal } from '@/components/SettingsModal';
 import { KeyboardShortcutsModal } from '@/components/dashboard/KeyboardShortcutsModal';
-import { useCamera } from '@/modules/camera/useCamera';
-import { useISLRecognition } from '@/modules/isl-recognition/useISLRecognition';
+import { useHandTracking } from '@/modules/camera/useHandTracking';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { speechEngine } from '@/modules/speech/SpeechRecognitionEngine';
+import { RecognitionState, SignPrediction } from '@/types/recognition';
 
 interface DashboardPageProps {
   onOpenShortcuts: () => void;
@@ -25,71 +25,86 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onCloseSettings,
   onCloseShortcuts,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionHistoryItem[]>([]);
+  const [recognizedSentence, setRecognizedSentence] = useState<string[]>([]);
+  const [currentPrediction, setCurrentPrediction] = useState<SignPrediction | null>(null);
   const { speakText } = useAccessibility();
 
-  // Camera Hook
+  // Hand Tracking & Computer Vision Hook
   const {
-    videoRef,
-    isStreaming,
-    devices,
-    selectedDeviceId,
-    isMirrored,
-    error: cameraError,
-    startCamera,
-    stopCamera,
-    switchCamera,
-    setIsMirrored,
-  } = useCamera(false);
-
-  // ISL Recognition Hook
-  const {
-    recognitionState,
-    activeHands,
-    currentPrediction,
-    recognizedSentence,
-    confidence,
-    fps,
-    error: recognitionError,
-    clearSentence,
-    removeLastWord,
-    speakSentence,
-    classifierInfo,
-  } = useISLRecognition({
     videoRef,
     canvasRef,
-    isStreaming,
-  });
+    landmarks,
+    handsDetected,
+    handedness,
+    confidence,
+    fps,
+    isRunning,
+    startCamera,
+    stopCamera,
+    error: cameraError,
+    debugMode,
+    setDebugMode,
+    devices,
+    selectedDeviceId,
+    switchCamera,
+    isMirrored,
+    setIsMirrored,
+  } = useHandTracking(false);
 
-  // Track historical recognition events
+  // Derive detection / recognition state without fake AI claims
+  const recognitionState: RecognitionState = !isRunning
+    ? 'idle'
+    : cameraError
+    ? 'error'
+    : handsDetected === 0
+    ? 'no_hands'
+    : 'tracking';
+
+  // Live detection event update (real detection telemetry, no fake gesture hallucination)
   useEffect(() => {
-    if (currentPrediction) {
-      setRecognitionHistory((prev) => {
-        // Prevent duplicate consecutive entries with identical sign within 1.5 seconds
-        const last = prev[0];
-        if (last && last.signId === currentPrediction.signId && Date.now() - last.timestamp.getTime() < 1500) {
-          return prev;
-        }
-        const item: RecognitionHistoryItem = {
-          id: `rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          signId: currentPrediction.signId,
-          label: currentPrediction.label,
-          gloss: currentPrediction.gloss,
-          confidence: currentPrediction.confidence,
-          timestamp: new Date(),
-        };
-        return [item, ...prev].slice(0, 30);
-      });
+    if (handsDetected > 0 && landmarks.length > 0) {
+      const handsStr = handedness.join(' & ');
+      const label = `${handsDetected} Hand${handsDetected > 1 ? 's' : ''} (${handsStr})`;
+      const gloss = handsDetected === 2 ? 'BOTH-HANDS' : handedness[0] === 'Right' ? 'RIGHT-HAND' : 'LEFT-HAND';
+
+      const prediction: SignPrediction = {
+        signId: `detected-${handsDetected}-${Date.now()}`,
+        label,
+        gloss,
+        confidence,
+        timestamp: Date.now(),
+        isFallback: false,
+        notes: `MediaPipe Hands: 21 3D landmarks tracked for ${handsStr}`,
+      };
+
+      setCurrentPrediction(prediction);
+    } else {
+      setCurrentPrediction(null);
     }
-  }, [currentPrediction]);
+  }, [handsDetected, handedness, confidence, landmarks.length]);
+
+  const clearSentence = useCallback(() => {
+    setRecognizedSentence([]);
+  }, []);
+
+  const removeLastWord = useCallback(() => {
+    setRecognizedSentence((prev) => prev.slice(0, -1));
+  }, []);
 
   const currentSentenceString = recognizedSentence.join(' ');
+
+  const speakSentence = useCallback(() => {
+    if (currentSentenceString) {
+      speakText(currentSentenceString);
+    }
+  }, [currentSentenceString, speakText]);
 
   const handleClearAllConversation = useCallback(() => {
     clearSentence();
     speechEngine.clear();
     setRecognitionHistory([]);
+    setCurrentPrediction(null);
   }, [clearSentence]);
 
   // Global Keyboard Shortcuts
@@ -105,7 +120,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
       if (key === 'c' || key === 'C') {
         e.preventDefault();
-        if (isStreaming) stopCamera();
+        if (isRunning) stopCamera();
         else startCamera();
       } else if (key === ' ') {
         e.preventDefault();
@@ -132,7 +147,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isStreaming,
+    isRunning,
     startCamera,
     stopCamera,
     currentSentenceString,
@@ -152,17 +167,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <CameraPanel
               videoRef={videoRef}
               canvasRef={canvasRef}
-              isStreaming={isStreaming}
+              isStreaming={isRunning}
               devices={devices}
               selectedDeviceId={selectedDeviceId}
               isMirrored={isMirrored}
-              error={cameraError || recognitionError}
+              error={cameraError}
               recognitionState={recognitionState}
-              activeHands={activeHands}
+              activeHands={landmarks}
               currentPrediction={currentPrediction}
               confidence={confidence}
               fps={fps}
-              isFallback={classifierInfo.isFallback}
+              isFallback={false}
+              debugMode={debugMode}
+              onToggleDebug={() => setDebugMode(!debugMode)}
               onStart={startCamera}
               onStop={stopCamera}
               onSwitchDevice={switchCamera}

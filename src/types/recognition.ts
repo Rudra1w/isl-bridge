@@ -6,10 +6,23 @@ export interface Point3D {
 
 export type Handedness = 'Left' | 'Right';
 
+export interface BoundingBox {
+  xMin: number;
+  yMin: number;
+  xMax: number;
+  yMax: number;
+  width: number;
+  height: number;
+}
+
 export interface HandLandmarks {
+  handIndex: number;
   handedness: Handedness;
-  landmarks: Point3D[]; // 21 standard MediaPipe landmarks
+  landmarks: Point3D[]; // 21 standard MediaPipe landmarks (image-relative 0-1)
+  normalizedLandmarks: Point3D[]; // Position & scale invariant coordinates (wrist-centered, scale-normalized)
+  boundingBox: BoundingBox;
   score: number;
+  timestamp: number;
 }
 
 export type RecognitionState =

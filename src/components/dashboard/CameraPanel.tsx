@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { Camera, CameraOff, Maximize2, Minimize2, FlipHorizontal, Activity, Hand, AlertCircle, Eye, ShieldAlert, Sparkles } from 'lucide-react';
+import { Camera, CameraOff, Maximize2, Minimize2, FlipHorizontal, Activity, Hand, AlertCircle, Eye, ShieldAlert, Sparkles, Terminal } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { formatConfidence } from '@/utils/formatters';
 import { RecognitionState, SignPrediction, HandLandmarks } from '@/types/recognition';
 import { CameraDeviceInfo } from '@/modules/camera/CameraStream';
+import { LandmarkDebugHUD } from './LandmarkDebugHUD';
 
 interface CameraPanelProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -25,6 +26,8 @@ interface CameraPanelProps {
   onStop: () => void;
   onSwitchDevice: (deviceId: string) => void;
   onToggleMirror: () => void;
+  debugMode?: boolean;
+  onToggleDebug?: () => void;
   className?: string;
 }
 
@@ -46,6 +49,8 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   onStop,
   onSwitchDevice,
   onToggleMirror,
+  debugMode = false,
+  onToggleDebug,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +113,21 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
           >
             <FlipHorizontal className="w-4 h-4" />
           </button>
+
+          {onToggleDebug && (
+            <button
+              onClick={onToggleDebug}
+              title={debugMode ? 'Hide Landmark Debug Inspector' : 'Show Landmark Debug Inspector'}
+              aria-label="Toggle Landmark Debug Inspector"
+              className={`p-2 rounded-xl border text-xs transition-colors ${
+                debugMode
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 shadow-sm'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Terminal className="w-4 h-4" />
+            </button>
+          )}
 
           <button
             onClick={toggleFullscreen}
@@ -259,6 +279,19 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
           </>
         )}
       </div>
+
+      {/* Landmark Debug HUD */}
+      {debugMode && onToggleDebug && (
+        <div className="p-3 bg-slate-950 border-b border-slate-800">
+          <LandmarkDebugHUD
+            landmarks={activeHands}
+            fps={fps}
+            confidence={confidence}
+            isOpen={debugMode}
+            onToggle={onToggleDebug}
+          />
+        </div>
+      )}
 
       {/* Footer Controls & Model Provenance */}
       <CardFooter className="flex-col sm:flex-row items-stretch sm:items-center gap-3">
