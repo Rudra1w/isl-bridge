@@ -49,12 +49,19 @@ export class GeminiService {
 
   public isAvailable(): boolean {
     const config = configManager.getConfig();
-    return Boolean(config.features.enableGemini && config.gemini.apiKey.trim().length > 0);
+    const hasDirectKey = config.gemini.apiKey.trim().length > 0;
+    const hasProxy = Boolean(config.gemini.proxyUrl && config.gemini.proxyUrl.trim().length > 0);
+    return Boolean(config.features.enableGemini && (hasDirectKey || hasProxy));
   }
 
   public getApiKey(): string {
     const config = configManager.getConfig();
     return config.gemini.apiKey.trim();
+  }
+
+  public getProxyUrl(): string {
+    const config = configManager.getConfig();
+    return (config.gemini.proxyUrl || '').trim();
   }
 
   /**
@@ -108,10 +115,37 @@ export class GeminiService {
 
   private async executeGeminiRequest(englishText: string): Promise<GeminiGlossResponse> {
     const config = configManager.getConfig();
+    const proxyUrl = (config.gemini.proxyUrl || '').trim();
     const apiKey = config.gemini.apiKey.trim();
 
+    // 1. If a backend proxy is configured, route through it (keeps API key secure on server)
+    if (proxyUrl) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.defaultTimeoutMs);
+      try {
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: englishText }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Proxy error (${res.status}): ${errText || res.statusText}`);
+        }
+
+        const data = await res.json();
+        const responseJsonString = typeof data === 'string' ? data : JSON.stringify(data);
+        return this.validateAndSanitizeResponse(responseJsonString, englishText);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // 2. Direct client-side SDK mode (requires local or user-provided API key)
     if (!apiKey) {
-      throw new Error('Missing Gemini API key.');
+      throw new Error('Missing Gemini API key or proxy URL.');
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);

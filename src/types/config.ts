@@ -32,6 +32,7 @@ export interface SpeechConfig {
 export interface GeminiConfig {
   apiKey: string;
   model: string;
+  proxyUrl?: string;
 }
 
 export interface AppConfig {

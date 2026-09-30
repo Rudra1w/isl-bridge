@@ -31,11 +31,13 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
   private demoFallback: ISLDemoHeuristicRecognizer;
 
   constructor(
-    modelUrl = '/models/isl-classifier/model.json',
-    labelsUrl = '/models/isl-classifier/labels.json'
+    modelUrl?: string,
+    labelsUrl?: string
   ) {
-    this.modelUrl = modelUrl;
-    this.labelsUrl = labelsUrl;
+    const basePath = import.meta.env.BASE_URL || '/';
+    const cleanBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+    this.modelUrl = modelUrl || `${cleanBase}models/isl-classifier/model.json`;
+    this.labelsUrl = labelsUrl || `${cleanBase}models/isl-classifier/labels.json`;
     this.demoFallback = new ISLDemoHeuristicRecognizer();
   }
 

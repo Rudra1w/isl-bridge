@@ -53,6 +53,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   gemini: {
     apiKey: import.meta.env.VITE_GEMINI_API_KEY || (import.meta.env.GEMINI_API_KEY as string) || '',
     model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash',
+    proxyUrl: import.meta.env.VITE_GEMINI_PROXY_URL || '',
   },
   performance: PERFORMANCE_PROFILES[defaultPerfMode],
 };

@@ -173,6 +173,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Optional Backend Proxy URL (Recommended for Public Deployments)
+                </label>
+                <input
+                  type="text"
+                  value={config.gemini.proxyUrl || ''}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      gemini: { ...config.gemini, proxyUrl: e.target.value },
+                    })
+                  }
+                  placeholder="e.g. /api/translate-gloss or https://api.yourdomain.com/gemini"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Using a backend proxy keeps your GEMINI_API_KEY secure without exposing it in browser network logs.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
                   Gemini Model
                 </label>
                 <input

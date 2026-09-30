@@ -1,6 +1,20 @@
 import { getSignEntry, getAllSignEntries } from './signDictionary';
 import { ResolvedSign, SignEntry } from './types';
 
+/**
+ * Normalizes an asset path with Vite's BASE_URL to support sub-path deployments (e.g. GitHub Pages).
+ */
+export function formatAssetUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const basePath = import.meta.env.BASE_URL || '/';
+  const cleanBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  const cleanPath = url.startsWith('/') ? url.slice(1) : url;
+  return `${cleanBase}${cleanPath}`;
+}
+
 export class SignAssetResolver {
   private static instance: SignAssetResolver;
 
@@ -48,7 +62,7 @@ export class SignAssetResolver {
         token: entry.token,
         label: entry.label,
         type: entry.type,
-        src: entry.src,
+        src: formatAssetUrl(entry.src),
         durationMs: entry.durationMs || 1500,
         isAvailable: true,
         isFingerspelled: false,
@@ -139,7 +153,7 @@ export class SignAssetResolver {
    * Search / filter signs in the dictionary
    */
   public search(query: string, category?: string): SignEntry[] {
-    const all = getAllSignEntries();
+    const all = this.getAll();
     const cleanQuery = (query || '').toLowerCase().trim();
 
     return all.filter((entry) => {
@@ -157,7 +171,10 @@ export class SignAssetResolver {
   }
 
   public getAll(): SignEntry[] {
-    return getAllSignEntries();
+    return getAllSignEntries().map((entry) => ({
+      ...entry,
+      src: formatAssetUrl(entry.src),
+    }));
   }
 }
 
