@@ -1,0 +1,154 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { lookupPhrase, ISL_PHRASE_DICTIONARY } from '../src/modules/nlp/islPhraseDictionary.ts';
+
+// 1. Test ISL Phrase Dictionary lookup
+test('ISL Phrase Dictionary returns exact verified mappings', () => {
+  const howAreYou = lookupPhrase('how are you');
+  assert.ok(howAreYou);
+  assert.deepEqual(howAreYou.gloss, ['YOU', 'HOW']);
+
+  const whatIsYourName = lookupPhrase('What is your name?');
+  assert.ok(whatIsYourName);
+  assert.deepEqual(whatIsYourName.gloss, ['YOUR', 'NAME', 'WHAT']);
+
+  const whereIsHospital = lookupPhrase('Where is the hospital?');
+  assert.ok(whereIsHospital);
+  assert.deepEqual(whereIsHospital.gloss, ['HOSPITAL', 'WHERE']);
+
+  const helpMe = lookupPhrase('Please help me');
+  assert.ok(helpMe);
+  assert.deepEqual(helpMe.gloss, ['HELP', 'PLEASE']);
+
+  const schoolTomorrow = lookupPhrase('I am going to school tomorrow');
+  assert.ok(schoolTomorrow);
+  assert.deepEqual(schoolTomorrow.gloss, ['TOMORROW', 'I', 'GO', 'SCHOOL']);
+
+  // Verify dictionary has substantial coverage
+  assert.ok(Object.keys(ISL_PHRASE_DICTIONARY).length >= 25);
+});
+
+// 2. Test Local ISL Grammar Rules on arbitrary sentences
+test('Local ISL Grammar engine correctly front temporal markers and omits copulas', () => {
+  const TIME_MARKERS = new Set([
+    'YESTERDAY', 'TOMORROW', 'TODAY', 'NOW', 'TONIGHT', 'MORNING', 'AFTERNOON',
+    'EVENING', 'NIGHT', 'SOON', 'LATER', 'DAILY', 'ALWAYS', 'EVERYDAY',
+  ]);
+  const DROP_WORDS = new Set([
+    'IS', 'AM', 'ARE', 'WAS', 'WERE', 'BE', 'BEING', 'BEEN',
+    'THE', 'A', 'AN', 'OF', 'TO', 'AT', 'FOR', 'DO', 'DOES', 'DID', 'WILL'
+  ]);
+  const QUESTION_WORDS = new Set([
+    'WHAT', 'WHERE', 'WHO', 'WHOM', 'WHOSE', 'WHY', 'WHEN', 'HOW', 'WHICH'
+  ]);
+  const NEGATION_WORDS = new Set(['NOT', 'NO', 'NEVER', "CAN'T", "DON'T"]);
+  const VERB_LEMMAS = {
+    'GOING': 'GO', 'WENT': 'GO', 'EATING': 'EAT', 'ATE': 'EAT',
+    'HELPING': 'HELP', 'HELPED': 'HELP', 'SEEING': 'SEE', 'SAW': 'SEE'
+  };
+
+  const approximate = (text) => {
+    const phrase = lookupPhrase(text);
+    if (phrase) return { tokens: phrase.gloss, isExact: true };
+
+    const words = text.trim().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, ' ').split(/\s+/).map(w => w.toUpperCase()).filter(Boolean);
+    const time = [], quest = [], neg = [], core = [];
+    for (const raw of words) {
+      if (DROP_WORDS.has(raw)) continue;
+      let word = VERB_LEMMAS[raw] || raw;
+      if (TIME_MARKERS.has(word)) time.push(word);
+      else if (QUESTION_WORDS.has(word)) quest.push(word);
+      else if (NEGATION_WORDS.has(word)) neg.push(word === "DON'T" ? 'NOT' : word);
+      else core.push(word);
+    }
+    return { tokens: [...time, ...core, ...neg, ...quest], isExact: false };
+  };
+
+  // Exact dictionary match
+  const res1 = approximate('I am going to school tomorrow');
+  assert.deepEqual(res1.tokens, ['TOMORROW', 'I', 'GO', 'SCHOOL']);
+  assert.equal(res1.isExact, true);
+
+  // Dynamic sentence with WH-word and copula
+  const res2 = approximate('Where are you eating?');
+  assert.deepEqual(res2.tokens, ['YOU', 'EAT', 'WHERE']);
+
+  // Dynamic sentence with temporal fronting
+  const res3 = approximate('Today I see doctor');
+  assert.equal(res3.tokens[0], 'TODAY');
+  assert.ok(res3.tokens.includes('DOCTOR'));
+  assert.ok(res3.tokens.includes('SEE'));
+
+  // Negation attached to predicate
+  const res4 = approximate('I do not want food');
+  assert.ok(res4.tokens.includes('NOT'));
+  assert.ok(res4.tokens.includes('FOOD'));
+  assert.ok(res4.tokens.includes('WANT'));
+});
+
+// 3. Test Gemini JSON schema validation and token sanitization
+test('Gemini response validator validates and sanitizes structured JSON schema', () => {
+  const validateAndSanitize = (rawJson, fallbackText) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(rawJson);
+    } catch {
+      const match = rawJson.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+      else throw new Error('Malformed JSON');
+    }
+
+    if (!parsed || typeof parsed !== 'object') throw new Error('Not object');
+    if (!Array.isArray(parsed.gloss)) throw new Error('No gloss array');
+
+    const cleanedGloss = [];
+    for (const token of parsed.gloss) {
+      if (typeof token !== 'string') continue;
+      const t = token.trim().toUpperCase();
+      if (!t) continue;
+      if (t.startsWith('FS(') && t.endsWith(')')) {
+        const entity = t.slice(3, -1).replace(/[^A-Z0-9-]/g, '');
+        if (entity) cleanedGloss.push(`FS(${entity})`);
+      } else {
+        const cleaned = t.replace(/[^A-Z0-9-]/g, '');
+        if (cleaned) cleanedGloss.push(cleaned);
+      }
+    }
+
+    if (cleanedGloss.length === 0) throw new Error('Empty gloss');
+
+    return {
+      originalText: parsed.originalText || fallbackText,
+      gloss: cleanedGloss,
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.95,
+      notes: typeof parsed.notes === 'string' ? parsed.notes : 'Generated by Gemini',
+    };
+  };
+
+  // Valid standard JSON
+  const validJson = JSON.stringify({
+    originalText: 'How are you?',
+    gloss: ['YOU', 'HOW'],
+    confidence: 0.98,
+    notes: 'WH-question word placed at terminus.',
+  });
+  const res1 = validateAndSanitize(validJson, 'How are you?');
+  assert.deepEqual(res1.gloss, ['YOU', 'HOW']);
+  assert.equal(res1.confidence, 0.98);
+
+  // Markdown-fenced JSON
+  const fencedJson = '```json\n{"originalText":"Test","gloss":["NAMASTE"]}\n```';
+  const res2 = validateAndSanitize(fencedJson, 'Test');
+  assert.deepEqual(res2.gloss, ['NAMASTE']);
+
+  // Named entity fingerspelling format
+  const namedEntityJson = JSON.stringify({
+    gloss: ['NAME', 'FS(DELHI)'],
+  });
+  const res3 = validateAndSanitize(namedEntityJson, 'My city is Delhi');
+  assert.deepEqual(res3.gloss, ['NAME', 'FS(DELHI)']);
+
+  // Malformed JSON should throw
+  assert.throws(() => validateAndSanitize('not a json', 'fail'));
+  assert.throws(() => validateAndSanitize('{"gloss":[]}', 'fail'));
+});

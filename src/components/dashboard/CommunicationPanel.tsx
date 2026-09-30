@@ -501,6 +501,10 @@ export const CommunicationPanel: React.FC<CommunicationPanelProps> = ({
               <SignSequenceViewer
                 translation={glossResult}
                 isLoading={isGlossLoading}
+                onRetry={() => {
+                  const targetText = finalTranscript || interimTranscript;
+                  if (targetText) translateGloss(targetText);
+                }}
               />
             </div>
           </div>
@@ -586,8 +590,11 @@ export const CommunicationPanel: React.FC<CommunicationPanelProps> = ({
 
             {/* Embedded Sign Sequence Viewer */}
             <SignSequenceViewer
-                translation={glossResult}
-                isLoading={isGlossLoading}
+              translation={glossResult}
+              isLoading={isGlossLoading}
+              onRetry={() => {
+                if (typedText.trim()) translateGloss(typedText);
+              }}
             />
           </div>
         )}

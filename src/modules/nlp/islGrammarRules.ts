@@ -1,32 +1,23 @@
-/**
- * ISL Grammar Rules & Linguistic Approximation Engine
- *
- * NOTE ON LINGUISTIC INTEGRITY:
- * Indian Sign Language (ISL) is a complete, natural visual-spatial language with its own
- * distinct grammar, syntax, spatial references, and non-manual features (facial expressions,
- * eye gaze, head movements, and body shifts).
- *
- * It is NOT a direct signed code for English, nor is it a simplistic reversal of English words.
- * The rule-based engine here operates as a transparent algorithmic APPROXIMATION when
- * high-level NLP (like Gemini) or dedicated neural grammar parsers are unavailable.
- */
+import { lookupPhrase } from './islPhraseDictionary';
 
 export interface RuleBasedGlossResult {
   tokens: string[];
   notes: string[];
+  isExactPhraseMatch?: boolean;
 }
 
-// Temporal words in ISL are fronted to establish the time frame of discourse
+// Temporal markers in ISL are fronted to establish the time-frame of discourse
 const TIME_MARKERS = new Set([
   'YESTERDAY', 'TOMORROW', 'TODAY', 'NOW', 'TONIGHT', 'MORNING', 'AFTERNOON',
   'EVENING', 'NIGHT', 'SOON', 'LATER', 'DAILY', 'ALWAYS', 'EVERYDAY', 'BEFORE', 'AFTER',
   'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
 ]);
 
-// English function words (articles, copulas, auxiliaries) that have no equivalent lexical sign in ISL
+// English function words (articles, copulas, auxiliaries) that have no direct lexical sign in ISL
 const DROP_WORDS = new Set([
   'IS', 'AM', 'ARE', 'WAS', 'WERE', 'BE', 'BEING', 'BEEN',
-  'THE', 'A', 'AN', 'OF', 'TO'
+  'THE', 'A', 'AN', 'OF', 'TO', 'AT', 'FOR', 'BY', 'WITH',
+  'DO', 'DOES', 'DID', 'WILL', 'SHALL', 'WOULD', 'SHOULD'
 ]);
 
 // Interrogative WH-markers in ISL are typically signed at the end of the question clause
@@ -35,45 +26,110 @@ const QUESTION_WORDS = new Set([
 ]);
 
 // Common negation markers
-const NEGATION_WORDS = new Set(['NOT', 'NO', 'NEVER', 'CANNOT', "CAN'T", "DON'T", "DIDN'T", "WON'T"]);
+const NEGATION_WORDS = new Set([
+  'NOT', 'NO', 'NEVER', 'CANNOT', "CAN'T", "DON'T", "DIDN'T", "WON'T"
+]);
 
-// Basic pronoun mappings
-const PRONOUN_MAP: Record<string, string> = {
-  'I': 'ME',
-  'ME': 'ME',
-  'MY': 'ME',
-  'MINE': 'ME',
-  'YOU': 'YOU',
-  'YOUR': 'YOU',
-  'YOURS': 'YOU',
-  'HE': 'HE',
-  'HIM': 'HE',
-  'HIS': 'HE',
-  'SHE': 'SHE',
-  'HER': 'SHE',
-  'HERS': 'SHE',
-  'WE': 'WE',
-  'US': 'WE',
-  'OUR': 'WE',
-  'OURS': 'WE',
-  'THEY': 'THEY',
-  'THEM': 'THEY',
-  'THEIR': 'THEY',
+// Base verb lemmatization mapping (reducing inflected English verbs to base concepts)
+const VERB_LEMMAS: Record<string, string> = {
+  'GOING': 'GO',
+  'WENT': 'GO',
+  'GOES': 'GO',
+  'GONE': 'GO',
+  'COMING': 'COME',
+  'CAME': 'COME',
+  'COMES': 'COME',
+  'EATING': 'EAT',
+  'ATE': 'EAT',
+  'EATS': 'EAT',
+  'DRINKING': 'DRINK',
+  'DRANK': 'DRINK',
+  'DRINKS': 'DRINK',
+  'HELPING': 'HELP',
+  'HELPED': 'HELP',
+  'HELPS': 'HELP',
+  'SLEEPING': 'SLEEP',
+  'SLEPT': 'SLEEP',
+  'SLEEPS': 'SLEEP',
+  'TALKING': 'SPEAK',
+  'TALKED': 'SPEAK',
+  'SPEAKING': 'SPEAK',
+  'SPOKE': 'SPEAK',
+  'SEEING': 'SEE',
+  'SAW': 'SEE',
+  'SEES': 'SEE',
+  'MEETING': 'MEET',
+  'MET': 'MEET',
+  'MEETS': 'MEET',
+  'WANTING': 'WANT',
+  'WANTED': 'WANT',
+  'WANTS': 'WANT',
+  'NEEDING': 'NEED',
+  'NEEDED': 'NEED',
+  'NEEDS': 'NEED',
+  'KNOWING': 'KNOW',
+  'KNEW': 'KNOW',
+  'KNOWS': 'KNOW',
+  'LOVING': 'LOVE',
+  'LOVED': 'LOVE',
+  'LOVES': 'LOVE',
 };
 
+// Common pronoun normalizations
+const PRONOUN_MAP: Record<string, string> = {
+  'I': 'I',
+  'ME': 'ME',
+  'MY': 'MY',
+  'MINE': 'MY',
+  'YOU': 'YOU',
+  'YOUR': 'YOUR',
+  'YOURS': 'YOUR',
+  'HE': 'HE',
+  'HIM': 'HE',
+  'HIS': 'HIS',
+  'SHE': 'SHE',
+  'HER': 'HER',
+  'HERS': 'HER',
+  'WE': 'WE',
+  'US': 'US',
+  'OUR': 'OUR',
+  'OURS': 'OUR',
+  'THEY': 'THEY',
+  'THEM': 'THEY',
+  'THEIR': 'THEIR',
+};
+
+/**
+ * Converts English text into an approximated ISL gloss sequence using
+ * verified dictionary mappings and grammatical heuristics.
+ */
 export function approximateISLGloss(englishText: string): RuleBasedGlossResult {
   const notes: string[] = [];
-  
+
   if (!englishText || !englishText.trim()) {
     return { tokens: [], notes: [] };
   }
 
-  // 1. Clean and tokenize
-  const rawWords = englishText
-    .trim()
-    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+  const rawClean = englishText.trim();
+
+  // 1. Check exact phrase dictionary first
+  const phraseMatch = lookupPhrase(rawClean);
+  if (phraseMatch) {
+    return {
+      tokens: [...phraseMatch.gloss],
+      notes: [
+        'Matched verified entry in ISL Phrase Dictionary.',
+        ...(phraseMatch.notes ? [phraseMatch.notes] : []),
+      ],
+      isExactPhraseMatch: true,
+    };
+  }
+
+  // 2. Tokenize and filter punctuation
+  const words = rawClean
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, ' ')
     .split(/\s+/)
-    .map(w => w.toUpperCase())
+    .map((w) => w.toUpperCase())
     .filter(Boolean);
 
   const timeTokens: string[] = [];
@@ -83,29 +139,34 @@ export function approximateISLGloss(englishText: string): RuleBasedGlossResult {
 
   let droppedCount = 0;
 
-  for (const raw of rawWords) {
-    // Check if word should be dropped (copulas, articles)
+  for (const raw of words) {
+    // Check if function word should be omitted
     if (DROP_WORDS.has(raw)) {
       droppedCount++;
       continue;
     }
 
-    // Map pronouns if applicable
-    const word = PRONOUN_MAP[raw] || raw;
+    // Apply lemmatization or pronoun mapping
+    let word = PRONOUN_MAP[raw] || raw;
+    if (VERB_LEMMAS[word]) {
+      word = VERB_LEMMAS[word];
+    }
 
     if (TIME_MARKERS.has(word)) {
       timeTokens.push(word);
     } else if (QUESTION_WORDS.has(word)) {
       questionTokens.push(word);
     } else if (NEGATION_WORDS.has(word)) {
-      negationTokens.push(word === "CAN'T" ? 'CAN-NOT' : word === "DON'T" ? 'NOT' : word);
+      negationTokens.push(
+        word === "CAN'T" ? 'CAN-NOT' : word === "DON'T" ? 'NOT' : word
+      );
     } else {
       coreTokens.push(word);
     }
   }
 
   if (droppedCount > 0) {
-    notes.push(`Omitted ${droppedCount} English grammatical articles/copulas not used in ISL.`);
+    notes.push(`Omitted ${droppedCount} English grammatical articles/copulas/prepositions not used in ISL.`);
   }
 
   if (timeTokens.length > 0) {
@@ -117,10 +178,11 @@ export function approximateISLGloss(englishText: string): RuleBasedGlossResult {
   }
 
   if (negationTokens.length > 0) {
-    notes.push(`Placed negation marker(s): ${negationTokens.join(', ')} with predicate.`);
+    notes.push(`Placed negation marker(s): ${negationTokens.join(', ')} alongside predicate.`);
   }
 
-  // Combine: [TIME] + [CORE (Subject-Object-Verb)] + [NEGATION] + [QUESTION]
+  // Combine components into ISL-oriented sequence:
+  // [TIME] + [CORE] + [NEGATION] + [QUESTION]
   const finalGloss = [
     ...timeTokens,
     ...coreTokens,
@@ -128,10 +190,11 @@ export function approximateISLGloss(englishText: string): RuleBasedGlossResult {
     ...questionTokens,
   ];
 
-  notes.push('Heuristic approximation applied (SOV/Topic-Comment tendential alignment).');
+  notes.push('Applied local ISL grammar heuristic (Time Fronting, SOV Alignment, WH-movement).');
 
   return {
     tokens: finalGloss,
     notes,
+    isExactPhraseMatch: false,
   };
 }

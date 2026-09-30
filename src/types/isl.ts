@@ -19,9 +19,14 @@ export interface GlossToken {
   note?: string;
 }
 
+export type GlossTranslationSource = 'gemini' | 'rule-based-fallback' | 'phrase-dictionary';
+
 export interface GlossTranslationResult {
   sourceText: string;
   tokens: GlossToken[];
-  source: 'gemini' | 'rule-based-fallback';
+  source: GlossTranslationSource;
+  confidence: number;
   linguisticNotes: string[];
+  isFallback: boolean;
+  fallbackReason?: string;
 }
