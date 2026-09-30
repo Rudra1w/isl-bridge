@@ -78,19 +78,31 @@ src/
 ```mermaid
 flowchart LR
     A["CameraModule<br/>(WebRTC Stream)"] --> B["Video Frame<br/>(HTMLVideoElement)"]
-    B --> C["Landmark Extractor<br/>(MediaPipe Hands Interface)"]
-    C --> D["Normalized Landmarks<br/>(21 3D Points per hand)"]
-    D --> E["ISL Classifier Engine<br/>(Active Model / Fallback)"]
-    E --> F["Recognition Event<br/>(sign, confidence, timestamp)"]
-    F --> G["Text Accumulator / UI<br/>(Live transcript)"]
+    B --> C["Landmark Extractor<br/>(MediaPipe Hands)"]
+    C --> D["Feature Extractor<br/>(155-D Invariant Vector)"]
+    D --> E["ISL Recognizer<br/>(TF.js / Demo Fallback)"]
+    E --> F["Temporal Smoother<br/>(Stability, Debounce, Cooldown)"]
+    F --> G["Text Accumulator & UI<br/>(Live transcript)"]
 ```
 
-1. **`CameraModule`** streams video frames from `navigator.mediaDevices.getUserMedia`.
-2. **`LandmarkExtractor`** processes frames at a controlled sampling rate (e.g., 20-30 FPS) to extract 21 3D landmarks for detected hands.
-3. **`ISLClassifierEngine`** calculates spatial angles, relative distances, and hand orientations:
-   - When a trained model is mounted, it predicts the gesture class.
-   - When no model is loaded, the pipeline operates in a clearly labeled demo/heuristic mode without misleading assertions of AI recognition.
-4. Output is debounced via a temporal stability filter before committing to the finalized sentence.
+1. **`CameraModule`** streams video frames from `navigator.mediaDevices.getUserMedia` with mirrored/device controls.
+2. **`LandmarkExtractor`** processes frames at ~30 FPS to extract 21 3D landmarks for detected hands.
+3. **`FeatureExtractor`** computes a position- and scale-invariant 155-dimensional feature vector:
+   - Normalized 3D coordinates relative to wrist ($P_0$), scaled by palm size $||P_9 - P_0||$.
+   - Radial distances from wrist to all 5 fingertips.
+   - Inter-fingertip spread angles/distances.
+   - Dual-hand relational vectors ($\Delta x, \Delta y, \Delta z$, inter-wrist distance, index-to-index distance).
+4. **`ISLRecognizer`** (`TensorFlowISLRecognizer`):
+   - Loads static model from `/models/isl-classifier/model.json`.
+   - Never crashes if model is absent: runs non-blocking pre-check and shifts to `ISLDemoHeuristicRecognizer`.
+   - Clearly flags state as `tensorflow` (Trained Neural Model) vs `demo-heuristic` (Geometric Baseline).
+5. **`TemporalSmoother`**:
+   - Confidence thresholding (rejects predictions $< 0.70$).
+   - Consecutive frame consistency ($K=6$ frames required).
+   - Cooldown period ($1200\text{ms}$) and duplicate word suppression (`HELLO HELLO` $\rightarrow$ `HELLO`).
+6. **Data Collection & Training Pipeline**:
+   - In-app dataset recording via `LandmarkRecorderModal` with static and 30-frame dynamic sequences.
+   - Fully reproducible Python training pipeline under `training/`.
 
 ### 3.2 Speech → Text Pipeline
 
@@ -177,35 +189,48 @@ export interface Point3D {
 export type Handedness = 'Left' | 'Right';
 
 export interface HandLandmarks {
+  handIndex: number;
   handedness: Handedness;
-  landmarks: Point3D[]; // 21 standard skeletal points
+  landmarks: Point3D[];          // 21 standard MediaPipe points (0..1)
+  normalizedLandmarks: Point3D[];// Wrist-centered & scale-normalized
+  boundingBox: BoundingBox;
   score: number;
+  timestamp: number;
 }
 
-export type RecognitionState = 
-  | 'idle' 
-  | 'starting' 
-  | 'tracking' 
-  | 'recognizing' 
-  | 'no_hands' 
-  | 'error';
+export interface HandLandmarkFrame {
+  hands: HandLandmarks[];
+  timestamp: number;
+}
 
-export interface SignPrediction {
-  signId: string;
+export interface TemporalSequenceFrame {
+  frames: HandLandmarkFrame[];
+  windowSize: number; // e.g. 30 frames
+  durationMs: number;
+}
+
+export interface Prediction {
   label: string;
   gloss: string;
   confidence: number;
   timestamp: number;
   isFallback: boolean;
+  modelType: 'tensorflow' | 'demo-heuristic' | 'placeholder';
+  isDynamic?: boolean;
+  notes?: string;
 }
 
-export interface ISLClassifier {
-  id: string;
-  name: string;
-  version: string;
-  isReady: boolean;
+export interface ISLRecognizer {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly isReady: boolean;
+  readonly modelType: ModelType;
+  readonly status: ModelStatus;
+  readonly supportedSigns: string[];
+
   initialize(): Promise<void>;
-  classify(hands: HandLandmarks[]): Promise<SignPrediction | null>;
+  predict(input: HandLandmarkFrame | TemporalSequenceFrame): Promise<Prediction | null>;
   dispose(): void;
 }
 ```
@@ -267,3 +292,38 @@ export interface GlossTranslationResult {
 2. **Graceful Degradation**: If Web Speech API is unsupported in a browser (e.g., Firefox), the UI indicates the status cleanly and allows text input. If Gemini is unconfigured or rate-limited, the application seamlessly switches to the local rule-based ISL gloss heuristic.
 3. **No Fake AI Claim**: The sign classification engine clearly shows whether a real landmark classifier is active, or if it is running in structural landmark tracking with heuristic demo fallbacks.
 4. **Independent Modular Lifecycle**: Modules initialize and teardown cleanly without memory leaks or hanging camera/audio streams.
+
+---
+
+## 6. Supported Sign Vocabulary & Model Classification Status
+
+### 6.1 Model Modes
+1. **`tensorflow` (Trained Neural Model)**:
+   - When a trained checkpoint exists at `/public/models/isl-classifier/model.json` with `labels.json`, TensorFlow.js performs client-side GPU-accelerated forward inference using the extracted 155-dimensional feature vectors.
+   - UI status badge: `TF.js Neural Model (Active)`.
+2. **`demo-heuristic` (Uncalibrated Geometric Baseline)**:
+   - Active by default whenever a trained neural checkpoint is not yet mounted.
+   - Evaluates physiological finger extension ratios, joint angles, and dual-hand spatial proximity.
+   - UI status badge: `Demo Geometric Heuristic`.
+   - Never generates hallucinated signs when hands are in transition or resting.
+3. **`placeholder`**:
+   - Explicitly reserved for mock testing stubs; forbidden from production runtime.
+
+### 6.2 Supported Vocabulary Classes (Baseline & Classifier Labels)
+| Sign Label | Gloss | Hands Required | Description / Articulation |
+|---|---|---|---|
+| `Namaste` | `NAMASTE` | 2 Hands | Palms pressed flat against each other, fingers pointing upright, hands centered in front of torso. |
+| `Hello` | `HELLO` | 1 Hand | Open palm facing forward, fingers extended upward. |
+| `Yes` | `YES` | 1 Hand | Closed fist with thumb extended vertically upright (thumbs up). |
+| `No` | `NO` | 1 Hand | Index finger extended upright with middle, ring, pinky curled; horizontal gesture. |
+| `You` | `YOU` | 1 Hand | Index finger extended directly forward toward interlocutor. |
+| `One` | `ONE` | 1 Hand | Index finger extended, remaining fingers curled. |
+| `Two` | `TWO` | 1 Hand | Index and middle fingers extended (V-shape), remaining curled. |
+| `Three` | `THREE` | 1 Hand | Index, middle, and ring fingers extended. |
+| `Four` | `FOUR` | 1 Hand | Index, middle, ring, and pinky extended, thumb folded. |
+| `Five` | `FIVE` | 1 Hand | All five fingers fully extended and spread. |
+| `Fist` | `FIST` | 1 Hand | All fingers curled into palm with thumb locked over proximal phalanges. |
+
+### 6.3 Data Collection & Custom Model Training
+- **In-App Recorder**: Click the **Database icon** in the Live Camera Feed panel to open the dataset collection modal. Collect labeled static frames or 30-frame temporal trajectories, and export directly as `isl_dataset_<timestamp>.json`.
+- **Python Training Pipeline**: Run `python training/scripts/train_isl_model.py --dataset path/to/dataset.json` and export with `python training/export/export_to_tfjs.py` directly to `/public/models/isl-classifier/`.

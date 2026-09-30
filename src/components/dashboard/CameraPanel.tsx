@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, CameraOff, Maximize2, Minimize2, FlipHorizontal, Activity, Hand, AlertCircle, Eye, ShieldAlert, Sparkles, Terminal } from 'lucide-react';
+import { Camera, CameraOff, Maximize2, Minimize2, FlipHorizontal, Activity, Hand, AlertCircle, Eye, ShieldAlert, Sparkles, Terminal, Database } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -28,6 +28,8 @@ interface CameraPanelProps {
   onToggleMirror: () => void;
   debugMode?: boolean;
   onToggleDebug?: () => void;
+  onOpenRecorder?: () => void;
+  modelStatus?: string;
   className?: string;
 }
 
@@ -51,6 +53,8 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   onToggleMirror,
   debugMode = false,
   onToggleDebug,
+  onOpenRecorder,
+  modelStatus,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,6 +130,17 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
               }`}
             >
               <Terminal className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenRecorder && (
+            <button
+              onClick={onOpenRecorder}
+              title="Record ISL Landmark Dataset"
+              aria-label="Record ISL Landmark Dataset"
+              className="p-2 rounded-xl border text-xs transition-colors bg-slate-900 border-slate-800 text-slate-400 hover:text-purple-300 hover:border-purple-500/40"
+            >
+              <Database className="w-4 h-4 text-purple-400" />
             </button>
           )}
 
@@ -319,15 +334,20 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
 
         <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-slate-400 flex-1">
           <div className="flex items-center gap-1.5">
-            {isFallback ? (
-              <span className="flex items-center gap-1 text-amber-400/90 text-[11px] font-medium">
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                Geometric Landmark Heuristic
-              </span>
-            ) : (
+            {modelStatus === 'ready' && !isFallback ? (
               <span className="flex items-center gap-1 text-emerald-400 text-[11px] font-medium">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                Active Classifier
+                Active Neural Model (TF.js)
+              </span>
+            ) : modelStatus === 'loading' ? (
+              <span className="flex items-center gap-1 text-indigo-400 text-[11px] font-medium">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0 animate-spin" />
+                Loading Neural Model...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-amber-400/90 text-[11px] font-medium">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                Geometric Demo Heuristic (Uncalibrated)
               </span>
             )}
           </div>

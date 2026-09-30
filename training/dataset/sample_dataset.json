@@ -1,0 +1,90 @@
+{
+  "name": "ISL-Bridge-Sample-Dataset",
+  "version": "1.0.0",
+  "createdAt": "2026-09-30T11:00:00.000Z",
+  "author": "ISL Bridge Dataset Recorder",
+  "classes": ["NAMASTE", "HELLO", "YES", "NO", "WATER"],
+  "totalSamples": 2,
+  "samples": [
+    {
+      "id": "sample-namaste-001",
+      "label": "NAMASTE",
+      "type": "static",
+      "timestamp": 1727694000000,
+      "frames": [
+        {
+          "timestamp": 1727694000000,
+          "hands": [
+            {
+              "handedness": "Left",
+              "landmarks": [
+                { "x": 0.45, "y": 0.55, "z": 0.0 }
+              ],
+              "normalizedLandmarks": [
+                { "x": 0.0, "y": 0.0, "z": 0.0 }
+              ],
+              "boundingBox": {
+                "xMin": 0.38,
+                "yMin": 0.42,
+                "xMax": 0.52,
+                "yMax": 0.68,
+                "width": 0.14,
+                "height": 0.26
+              },
+              "score": 0.94
+            },
+            {
+              "handedness": "Right",
+              "landmarks": [
+                { "x": 0.55, "y": 0.55, "z": 0.0 }
+              ],
+              "normalizedLandmarks": [
+                { "x": 0.0, "y": 0.0, "z": 0.0 }
+              ],
+              "boundingBox": {
+                "xMin": 0.48,
+                "yMin": 0.42,
+                "xMax": 0.62,
+                "yMax": 0.68,
+                "width": 0.14,
+                "height": 0.26
+              },
+              "score": 0.95
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sample-hello-001",
+      "label": "HELLO",
+      "type": "static",
+      "timestamp": 1727694005000,
+      "frames": [
+        {
+          "timestamp": 1727694005000,
+          "hands": [
+            {
+              "handedness": "Right",
+              "landmarks": [
+                { "x": 0.60, "y": 0.35, "z": 0.0 }
+              ],
+              "normalizedLandmarks": [
+                { "x": 0.0, "y": 0.0, "z": 0.0 }
+              ],
+              "boundingBox": {
+                "xMin": 0.50,
+                "yMin": 0.20,
+                "xMax": 0.70,
+                "yMax": 0.50,
+                "width": 0.20,
+                "height": 0.30
+              },
+              "score": 0.92
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

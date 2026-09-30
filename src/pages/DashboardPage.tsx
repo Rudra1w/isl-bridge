@@ -8,6 +8,9 @@ import { KeyboardShortcutsModal } from '@/components/dashboard/KeyboardShortcuts
 import { useHandTracking } from '@/modules/camera/useHandTracking';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { speechEngine } from '@/modules/speech/SpeechRecognitionEngine';
+import { tfjsISLRecognizer } from '@/modules/isl-recognition/TensorFlowISLRecognizer';
+import { TemporalSmoother } from '@/modules/isl-recognition/TemporalSmoother';
+import { LandmarkRecorderModal } from '@/components/dashboard/LandmarkRecorderModal';
 import { RecognitionState, SignPrediction } from '@/types/recognition';
 
 interface DashboardPageProps {
@@ -28,7 +31,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionHistoryItem[]>([]);
   const [recognizedSentence, setRecognizedSentence] = useState<string[]>([]);
   const [currentPrediction, setCurrentPrediction] = useState<SignPrediction | null>(null);
+  const [isRecorderOpen, setIsRecorderOpen] = useState<boolean>(false);
+  const [modelStatus, setModelStatus] = useState<string>('uninitialized');
   const { speakText } = useAccessibility();
+
+  // Smoother instance and inference concurrency lock
+  const smootherRef = React.useRef(new TemporalSmoother({
+    confidenceThreshold: 0.70,
+    requiredConsecutiveFrames: 6,
+    cooldownMs: 1200,
+  }));
+  const isPredictingRef = React.useRef<boolean>(false);
+
+  // Initialize TensorFlow.js ISL Classifier on mount
+  useEffect(() => {
+    let isMounted = true;
+    tfjsISLRecognizer.initialize().then(() => {
+      if (isMounted) {
+        setModelStatus(tfjsISLRecognizer.status);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Hand Tracking & Computer Vision Hook
   const {
@@ -36,7 +62,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     canvasRef,
     landmarks,
     handsDetected,
-    handedness,
+    handedness: _handedness,
     confidence,
     fps,
     isRunning,
@@ -59,30 +85,76 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     ? 'error'
     : handsDetected === 0
     ? 'no_hands'
+    : currentPrediction
+    ? 'recognizing'
     : 'tracking';
 
-  // Live detection event update (real detection telemetry, no fake gesture hallucination)
+  // Run feature extraction and classification whenever new landmarks arrive
   useEffect(() => {
-    if (handsDetected > 0 && landmarks.length > 0) {
-      const handsStr = handedness.join(' & ');
-      const label = `${handsDetected} Hand${handsDetected > 1 ? 's' : ''} (${handsStr})`;
-      const gloss = handsDetected === 2 ? 'BOTH-HANDS' : handedness[0] === 'Right' ? 'RIGHT-HAND' : 'LEFT-HAND';
-
-      const prediction: SignPrediction = {
-        signId: `detected-${handsDetected}-${Date.now()}`,
-        label,
-        gloss,
-        confidence,
-        timestamp: Date.now(),
-        isFallback: false,
-        notes: `MediaPipe Hands: 21 3D landmarks tracked for ${handsStr}`,
-      };
-
-      setCurrentPrediction(prediction);
-    } else {
+    if (landmarks.length === 0) {
+      smootherRef.current.process(null);
       setCurrentPrediction(null);
+      return;
     }
-  }, [handsDetected, handedness, confidence, landmarks.length]);
+
+    let isMounted = true;
+
+    const runRecognition = async () => {
+      if (isPredictingRef.current) return;
+      isPredictingRef.current = true;
+
+      try {
+        const rawPred = await tfjsISLRecognizer.predict({
+          hands: landmarks,
+          timestamp: Date.now(),
+        });
+
+        if (!isMounted) return;
+
+        const { stablePrediction, shouldCommit, committedWord } = smootherRef.current.process(rawPred);
+
+        if (stablePrediction) {
+          setCurrentPrediction({
+            signId: `sign-${stablePrediction.label}-${stablePrediction.timestamp}`,
+            label: stablePrediction.label,
+            gloss: stablePrediction.gloss,
+            confidence: stablePrediction.confidence,
+            timestamp: stablePrediction.timestamp,
+            isFallback: stablePrediction.isFallback,
+            modelType: stablePrediction.modelType,
+            notes: stablePrediction.notes,
+          });
+        } else {
+          setCurrentPrediction(null);
+        }
+
+        if (shouldCommit && committedWord) {
+          setRecognizedSentence((prev) => [...prev, committedWord]);
+          setRecognitionHistory((prev) => [
+            {
+              id: `history-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              signId: `sign-${committedWord}`,
+              label: committedWord,
+              gloss: committedWord.toUpperCase().replace(/\s+/g, '-'),
+              confidence: stablePrediction ? stablePrediction.confidence : 0.85,
+              timestamp: new Date(),
+            },
+            ...prev.slice(0, 49),
+          ]);
+        }
+      } catch (err) {
+        console.warn('[ISL Recognition] Inference frame exception:', err);
+      } finally {
+        isPredictingRef.current = false;
+      }
+    };
+
+    runRecognition();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [landmarks]);
 
   const clearSentence = useCallback(() => {
     setRecognizedSentence([]);
@@ -177,7 +249,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               currentPrediction={currentPrediction}
               confidence={confidence}
               fps={fps}
-              isFallback={false}
+              isFallback={currentPrediction?.isFallback ?? false}
+              modelStatus={
+                modelStatus === 'ready'
+                  ? 'TF.js Neural Model (Active)'
+                  : modelStatus === 'loading'
+                  ? 'Loading Model...'
+                  : 'Demo Geometric Heuristic'
+              }
+              onOpenRecorder={() => setIsRecorderOpen(true)}
               debugMode={debugMode}
               onToggleDebug={() => setDebugMode(!debugMode)}
               onStart={startCamera}
@@ -223,6 +303,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <KeyboardShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={onCloseShortcuts}
+      />
+
+      {/* Landmark Recorder Modal for Dataset Collection */}
+      <LandmarkRecorderModal
+        isOpen={isRecorderOpen}
+        onClose={() => setIsRecorderOpen(false)}
+        activeHands={landmarks}
       />
     </div>
   );
