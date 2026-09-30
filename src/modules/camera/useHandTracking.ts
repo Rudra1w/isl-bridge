@@ -4,6 +4,7 @@ import { landmarkExtractor } from '@/modules/isl-recognition/LandmarkExtractor';
 import { HandLandmarks, Handedness } from '@/types/recognition';
 import { configManager } from '@/config/appConfig';
 import { PerformanceMode } from '@/types/config';
+import { systemStatusService } from '@/services/systemStatusService';
 
 export interface UseHandTrackingReturn {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -106,6 +107,7 @@ export function useHandTracking(autoStart = false): UseHandTrackingReturn {
     setConfidence(0);
     setFps(0);
     setInferenceFps(0);
+    systemStatusService.updateCameraStatus('READY', 'Camera stopped; ready to restart');
   }, []);
 
   const startCamera = useCallback(async (deviceIdOverride?: string) => {
@@ -120,6 +122,7 @@ export function useHandTracking(autoStart = false): UseHandTrackingReturn {
       const devId = deviceIdOverride || selectedDeviceId || undefined;
       await cameraManager.startStream(videoRef.current, devId, targetWidth, targetHeight);
       setIsRunning(true);
+      systemStatusService.updateCameraStatus('ACTIVE', 'Camera stream active and tracking');
 
       // Ensure extractor is ready
       if (!landmarkExtractor.isReady()) {
@@ -129,6 +132,7 @@ export function useHandTracking(autoStart = false): UseHandTrackingReturn {
       const msg = err instanceof Error ? err.message : 'Failed to start camera';
       setError(msg);
       setIsRunning(false);
+      systemStatusService.updateCameraStatus('ERROR', msg);
     }
   }, [selectedDeviceId]);
 

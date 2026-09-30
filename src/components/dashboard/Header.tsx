@@ -21,6 +21,8 @@ interface HeaderProps {
   onModeChange: (mode: AppNavigationMode) => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
+  onOpenSystemStatus?: () => void;
+  onOpenDemoMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,6 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   onModeChange,
   onOpenSettings,
   onOpenShortcuts,
+  onOpenSystemStatus,
+  onOpenDemoMode,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-slate-950/95 backdrop-blur-md border-b border-slate-800/90 shadow-sm">
@@ -53,11 +57,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: System & Engine Health Status */}
-        <div className="hidden lg:flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800/80 text-xs">
+        {/* Center: System & Engine Health Status (Clickable for full diagnostics) */}
+        <button
+          onClick={onOpenSystemStatus}
+          title="Click to view live subsystem diagnostics"
+          className="hidden lg:flex items-center gap-2 bg-slate-900/80 hover:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-xs transition-colors cursor-pointer group"
+        >
           <div className="flex items-center gap-1.5 pr-2.5 border-r border-slate-800">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-300 font-medium">System Online</span>
+            <span className="text-slate-300 font-medium group-hover:text-white">System Status</span>
           </div>
 
           <div className="flex items-center gap-2 pl-1">
@@ -87,10 +95,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <Badge variant="success" size="sm">
               <ShieldCheck className="w-3 h-3 mr-1" />
-              Privacy Safe
+              Status
             </Badge>
           </div>
-        </div>
+        </button>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
@@ -130,6 +138,21 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">Lexicon</span>
             </button>
           </div>
+
+          {/* Hackathon Demo Mode Trigger */}
+          {onOpenDemoMode && (
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={onOpenDemoMode}
+              leftIcon={<Sparkles className="w-4 h-4 text-amber-400" />}
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-950/40 hover:border-amber-500/50"
+              title="Launch interactive presentation simulation"
+            >
+              <span className="hidden sm:inline">Demo Mode</span>
+              <span className="sm:hidden">Demo</span>
+            </Button>
+          )}
 
           <Button
             variant="ghost"

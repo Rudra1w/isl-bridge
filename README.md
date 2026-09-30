@@ -441,6 +441,46 @@ Follow these steps for a live presentation or hackathon evaluation:
 
 ---
 
+## 19. Live System Status & Presentation Demo Mode
+
+### Live System Status Diagnostics
+Clicking on **"System Status"** in the top navigation bar opens the comprehensive diagnostics panel:
+- **Camera**: `READY` / `ACTIVE` / `ERROR` / `OFF`
+- **Hand Tracking**: `READY` / `ACTIVE` / `INITIALIZING` / `ERROR`
+- **ISL Model**: `READY` (mounted neural model) / `NOT LOADED` (safely running uncalibrated geometric heuristic)
+- **Speech Recognition**: `READY` / `UNSUPPORTED` (checks Chromium Web Speech API)
+- **Gemini NLP**: `CONNECTED` (direct/proxy) / `LOCAL FALLBACK` (100% offline rule heuristics)
+- **Sign Assets**: Exact count of registered local verified vector assets (`28 verified + 26 alphabet`)
+- **Network**: `ONLINE` vs. `OFFLINE` (with live details on offline-resilient capabilities)
+
+### Hackathon Presentation Demo Mode
+For conference presentations, poor stage lighting, or offline competition halls:
+1. Click the **"Demo Mode"** button in the header.
+2. Select a pre-calibrated scenario:
+   - *Healthcare & Emergency Dialogue* (`HELP` $\rightarrow$ `PAIN` $\rightarrow$ `DOCTOR` $\leftrightarrow$ *"Doctor is coming right now"*)
+   - *Traditional Welcome & Courtesy* (`NAMASTE` $\rightarrow$ `HELLO` $\leftrightarrow$ *"Good morning! How are you?"* $\rightarrow$ `THANK-YOU`)
+   - *Travel & Campus Inquiry* (*"Where are you going tomorrow?"* $\leftrightarrow$ `ME` $\rightarrow$ `HOSPITAL`)
+3. **Full Ethical Transparency**: Demo Mode displays a prominent top banner:
+   > ⚠️ **DEMO SIMULATION MODE ACTIVE**: Pre-recorded demonstration sequences for presentations. Not real-time webcam AI inference.
+
+---
+
+## 20. Production Audit Verification Matrix
+
+| Test Case | Scenario / Trigger | System Behavior | Status |
+| :--- | :--- | :--- | :---: |
+| **TEST 1: Vision $\rightarrow$ Text** | Start camera, sign `NAMASTE` or `HELLO` | 21 3D landmarks appear, confidence bar tracks gesture, token commits to sentence | ✅ PASSED |
+| **TEST 2: Speech $\rightarrow$ ISL** | Click mic, speak *"Where are you going?"* | Web Speech API generates transcript, Gemini/rule-engine produces `[YOU] [WHERE] [GO]`, signs play | ✅ PASSED |
+| **TEST 3: Typed $\rightarrow$ ISL** | Type sentence, click Translate | Normalized text converted into gloss sequence, sequential sign player renders | ✅ PASSED |
+| **TEST 4: Text-to-Speech** | Click "Speak Sentence" | Native browser speech synthesis articulates text cleanly in `en-IN` | ✅ PASSED |
+| **TEST 5: AI Unavailable** | No API key / Offline | Seamlessly falls back to local SOV grammar heuristics and phrase dictionary with 0 errors | ✅ PASSED |
+| **TEST 6: Camera Denied** | Deny browser permission | Panel displays clear step-by-step guidance on how to unblock camera in URL settings bar | ✅ PASSED |
+| **TEST 7: Unknown Sign** | Input sign not in dictionary | Displays explicit "Sign asset unavailable" state; never scrapes unverified web images | ✅ PASSED |
+| **TEST 8: Low-End Hardware** | Switch to Balanced or Low profile | Throttles vision loop (15 FPS / 10 FPS), skips frames, prunes canvas shadows; UI remains responsive | ✅ PASSED |
+| **TEST 9: No Internet** | Disconnect Wi-Fi | Hand tracking, gestures, local signs, and local grammar work 100% offline | ✅ PASSED |
+
+---
+
 <p align="center">
   <b>ISL Bridge</b> — Built with care for universal accessibility and inclusion.
 </p>

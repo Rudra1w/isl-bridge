@@ -201,16 +201,32 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
           </div>
         )}
 
-        {/* State: Camera Error */}
+        {/* State: Camera Error with Actionable Guidance */}
         {error && (
-          <div className="relative z-10 flex flex-col items-center justify-center text-center p-6 max-w-sm">
-            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-3">
-              <AlertCircle className="w-7 h-7" />
+          <div className="relative z-10 flex flex-col items-center justify-center text-center p-5 max-w-sm animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-2.5 shadow-lg">
+              <AlertCircle className="w-6 h-6" />
             </div>
-            <h4 className="text-sm font-semibold text-rose-300 mb-1">Camera Notice</h4>
-            <p className="text-xs text-rose-200/80 mb-4 leading-relaxed">{error}</p>
+            <h4 className="text-sm font-bold text-rose-300 mb-1">
+              {error.toLowerCase().includes('permission') || error.toLowerCase().includes('denied') || error.toLowerCase().includes('notallowed')
+                ? 'Camera Permission Blocked'
+                : 'Camera Notice'}
+            </h4>
+            <p className="text-xs text-rose-200/90 mb-3 leading-relaxed">
+              {error}
+            </p>
+
+            {(error.toLowerCase().includes('permission') || error.toLowerCase().includes('denied') || error.toLowerCase().includes('notallowed')) && (
+              <div className="mb-3.5 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 text-left space-y-1">
+                <span className="font-bold text-indigo-300 block mb-0.5">How to unblock:</span>
+                <div>1. Click the <strong>lock / site settings</strong> icon in your browser URL bar.</div>
+                <div>2. Set <strong>Camera</strong> permission to <strong>"Allow"</strong>.</div>
+                <div>3. Click the Retry button below or refresh the page.</div>
+              </div>
+            )}
+
             <Button variant="secondary" size="sm" onClick={onStart}>
-              Retry Camera
+              Retry Camera Access
             </Button>
           </div>
         )}
