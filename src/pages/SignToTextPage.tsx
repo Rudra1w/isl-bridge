@@ -3,12 +3,20 @@ import { useCamera } from '@/modules/camera/useCamera';
 import { CameraView } from '@/modules/camera/CameraView';
 import { useISLRecognition } from '@/modules/isl-recognition/useISLRecognition';
 import { RecognitionStatusBadge } from '@/modules/isl-recognition/RecognitionStatusBadge';
-import { Volume2, Copy, Check, Delete, RotateCcw, MessageSquareQuote, ShieldAlert } from 'lucide-react';
+import { Volume2, Copy, Check, Delete, RotateCcw, MessageSquareQuote, ShieldAlert, Send, CheckCircle2 } from 'lucide-react';
 import { StorageService } from '@/services/storageService';
+import { conversationService } from '@/services/conversationService';
 
-export const SignToTextPage: React.FC = () => {
+interface SignToTextPageProps {
+  onNavigateToConversation?: () => void;
+}
+
+export const SignToTextPage: React.FC<SignToTextPageProps> = ({
+  onNavigateToConversation,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [sentSuccess, setSentSuccess] = useState<boolean>(false);
 
   const {
     videoRef,
@@ -54,6 +62,23 @@ export const SignToTextPage: React.FC = () => {
       input: `${recognizedSentence.length} signs`,
       output: fullSentence,
     });
+  };
+
+  const handleSendToConversation = () => {
+    if (!fullSentence.trim()) return;
+    conversationService.addMessage(
+      'signer',
+      'ISL Signer',
+      'sign_camera',
+      fullSentence,
+      recognizedSentence.map((w) => w.toUpperCase()),
+      confidence || 0.9
+    );
+    setSentSuccess(true);
+    setTimeout(() => setSentSuccess(false), 2000);
+    if (onNavigateToConversation) {
+      setTimeout(() => onNavigateToConversation(), 500);
+    }
   };
 
   return (
@@ -178,7 +203,7 @@ export const SignToTextPage: React.FC = () => {
                   <button
                     onClick={handleCopy}
                     disabled={!fullSentence}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 disabled:opacity-40 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold disabled:opacity-40 transition-colors"
                   >
                     {copied ? (
                       <>
@@ -188,7 +213,24 @@ export const SignToTextPage: React.FC = () => {
                     ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        Copy Text
+                        Copy
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleSendToConversation}
+                    disabled={!fullSentence}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 disabled:opacity-40 transition-all active:scale-95"
+                  >
+                    {sentSuccess ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                        Sent to Chat!
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send to Chat
                       </>
                     )}
                   </button>

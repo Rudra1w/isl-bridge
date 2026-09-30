@@ -3,8 +3,6 @@ import { CameraPanel } from '@/components/dashboard/CameraPanel';
 import { TranslationPanel, RecognitionHistoryItem } from '@/components/dashboard/TranslationPanel';
 import { CommunicationPanel } from '@/components/dashboard/CommunicationPanel';
 import { BottomToolbar } from '@/components/dashboard/BottomToolbar';
-import { SettingsModal } from '@/components/SettingsModal';
-import { KeyboardShortcutsModal } from '@/components/dashboard/KeyboardShortcutsModal';
 import { useHandTracking } from '@/modules/camera/useHandTracking';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { speechEngine } from '@/modules/speech/SpeechRecognitionEngine';
@@ -15,18 +13,10 @@ import { RecognitionState, SignPrediction } from '@/types/recognition';
 
 interface DashboardPageProps {
   onOpenShortcuts: () => void;
-  isSettingsOpen: boolean;
-  isShortcutsOpen: boolean;
-  onCloseSettings: () => void;
-  onCloseShortcuts: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   onOpenShortcuts,
-  isSettingsOpen,
-  isShortcutsOpen,
-  onCloseSettings,
-  onCloseShortcuts,
 }) => {
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionHistoryItem[]>([]);
   const [recognizedSentence, setRecognizedSentence] = useState<string[]>([]);
@@ -291,18 +281,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         currentSentence={currentSentenceString}
         onClearConversation={handleClearAllConversation}
         onOpenShortcuts={onOpenShortcuts}
-      />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={onCloseSettings}
-      />
-
-      {/* Keyboard Shortcuts Modal */}
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsOpen}
-        onClose={onCloseShortcuts}
       />
 
       {/* Landmark Recorder Modal for Dataset Collection */}

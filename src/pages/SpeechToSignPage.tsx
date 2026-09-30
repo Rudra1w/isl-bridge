@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { SpeechInputPanel } from '@/modules/speech/SpeechInputPanel';
 import { useISLGloss } from '@/modules/nlp/useISLGloss';
 import { SignPlayer } from '@/modules/sign-output/SignPlayer';
-import { ArrowRight, Sparkles, Lightbulb, AlertCircle } from 'lucide-react';
+import { ArrowRight, Sparkles, Lightbulb, AlertCircle, Send, CheckCircle2 } from 'lucide-react';
 import { StorageService } from '@/services/storageService';
+import { conversationService } from '@/services/conversationService';
 
 const SAMPLE_SENTENCES = [
   'What is your name?',
@@ -14,8 +15,15 @@ const SAMPLE_SENTENCES = [
   'Namaste, welcome to my home.',
 ];
 
-export const SpeechToSignPage: React.FC = () => {
+interface SpeechToSignPageProps {
+  onNavigateToConversation?: () => void;
+}
+
+export const SpeechToSignPage: React.FC<SpeechToSignPageProps> = ({
+  onNavigateToConversation,
+}) => {
   const [textInput, setTextInput] = useState<string>('');
+  const [sentSuccess, setSentSuccess] = useState<boolean>(false);
   const { result, isLoading, error, translate } = useISLGloss();
 
   const handleTranslate = (text: string) => {
@@ -28,6 +36,28 @@ export const SpeechToSignPage: React.FC = () => {
       input: trimmed,
       output: 'ISL Gloss generated',
     });
+  };
+
+  const handleSendToConversation = () => {
+    const trimmed = textInput.trim();
+    if (!trimmed) return;
+    const glossTokens = result?.tokens && result.tokens.length > 0
+      ? result.tokens.map(t => t.gloss || t.originalWord)
+      : trimmed.toUpperCase().split(/\s+/);
+
+    conversationService.addMessage(
+      'hearing',
+      'Hearing Speaker',
+      'typed',
+      trimmed,
+      glossTokens,
+      result?.confidence || 0.95
+    );
+    setSentSuccess(true);
+    setTimeout(() => setSentSuccess(false), 2000);
+    if (onNavigateToConversation) {
+      setTimeout(() => onNavigateToConversation(), 500);
+    }
   };
 
   const handleSampleClick = (sample: string) => {
@@ -78,27 +108,47 @@ export const SpeechToSignPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-slate-500">
                   {textInput.length} characters
                 </span>
-                <button
-                  type="submit"
-                  disabled={!textInput.trim() || isLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-40"
-                >
-                  {isLoading ? (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                      Translating...
-                    </>
-                  ) : (
-                    <>
-                      Translate to Signs
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSendToConversation}
+                    disabled={!textInput.trim()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold disabled:opacity-40 transition-colors"
+                  >
+                    {sentSuccess ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Sent!
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5 text-indigo-400" />
+                        Send to Chat
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!textInput.trim() || isLoading}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-40"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                        Translating...
+                      </>
+                    ) : (
+                      <>
+                        Translate to Signs
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

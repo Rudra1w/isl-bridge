@@ -1,22 +1,32 @@
-import { Hand, Settings, ShieldCheck, Sparkles, Volume2, Video } from 'lucide-react';
+import React from 'react';
+import {
+  Hand,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Volume2,
+  Video,
+  BookOpen,
+  LayoutDashboard,
+  MessageSquareText,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { AppConfig } from '@/types/config';
-
-import { BookOpen, LayoutDashboard } from 'lucide-react';
+import { AppNavigationMode } from '@/types/conversation';
 
 interface HeaderProps {
   config: AppConfig;
-  activePage: 'dashboard' | 'dictionary';
-  onPageChange: (page: 'dashboard' | 'dictionary') => void;
+  activeMode: AppNavigationMode;
+  onModeChange: (mode: AppNavigationMode) => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   config,
-  activePage,
-  onPageChange,
+  activeMode,
+  onModeChange,
   onOpenSettings,
   onOpenShortcuts,
 }) => {
@@ -84,29 +94,40 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* Navigation Mode Pill */}
+          {/* Quick Flagship Navigation Pills */}
           <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800">
             <button
-              onClick={() => onPageChange('dashboard')}
+              onClick={() => onModeChange('conversation')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activePage === 'dashboard'
+                activeMode === 'conversation'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <MessageSquareText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Conversation</span>
+            </button>
+            <button
+              onClick={() => onModeChange('dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeMode === 'dashboard'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span className="hidden sm:inline">Studio</span>
             </button>
             <button
-              onClick={() => onPageChange('dictionary')}
+              onClick={() => onModeChange('dictionary')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activePage === 'dictionary'
+                activeMode === 'dictionary'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sign Lexicon</span>
+              <span className="hidden sm:inline">Lexicon</span>
             </button>
           </div>
 
