@@ -5,6 +5,16 @@ export interface SpeechRecognitionResult {
   timestamp: number;
 }
 
+export type SpeechRecognitionStatus =
+  | 'ready'
+  | 'listening'
+  | 'processing'
+  | 'recognized'
+  | 'blocked'
+  | 'service-unavailable'
+  | 'unsupported'
+  | 'error';
+
 export interface SpeechEngineState {
   isListening: boolean;
   isSupported: boolean;
@@ -19,3 +29,10 @@ export type SpeechLocaleOption = {
   label: string;
   regionalVariant?: string;
 };
+
+export type SpeechSynthesisStatus =
+  | 'idle'
+  | 'speaking'
+  | 'paused'
+  | 'error'
+  | 'unsupported';

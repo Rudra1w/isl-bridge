@@ -31,6 +31,8 @@ const DEFAULT_SETTINGS: AccessibilitySettings = {
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
 
+import { speechSynthesisService } from '@/modules/speech/SpeechSynthesisService';
+
 export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<AccessibilitySettings>(() => {
     try {
@@ -64,16 +66,9 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [settings]);
 
   const speakText = (text: string) => {
-    if (!('speechSynthesis' in window)) return;
     const clean = text.trim();
     if (!clean) return;
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.lang = 'en-IN';
-    utterance.volume = settings.volume;
-    utterance.rate = 0.95;
-    window.speechSynthesis.speak(utterance);
+    speechSynthesisService.speak(clean, { volume: settings.volume, rate: 0.95 });
   };
 
   return (
