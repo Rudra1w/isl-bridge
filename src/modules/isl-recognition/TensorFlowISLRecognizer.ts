@@ -22,6 +22,7 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
   public readonly version = '1.0.0';
   public modelType: ModelType = 'tensorflow';
   public status: ModelStatus = 'uninitialized';
+  public lastInferenceLatencyMs: number = 0;
 
   private model: tf.LayersModel | tf.GraphModel | null = null;
   private modelUrl: string;
@@ -96,6 +97,8 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
   public async predict(
     input: HandLandmarkFrame | TemporalSequenceFrame
   ): Promise<Prediction | null> {
+    const t0 = performance.now();
+
     // If neural model is not active, delegate cleanly to demo heuristic
     if (this.status !== 'ready' || !this.model) {
       return this.demoFallback.predict(input);
@@ -134,6 +137,7 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
     }
 
     const label = this.labels[maxIdx] || `Sign_${maxIdx}`;
+    this.lastInferenceLatencyMs = Math.round(performance.now() - t0);
 
     return {
       label,
@@ -142,8 +146,20 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
       timestamp: frame.timestamp || Date.now(),
       isFallback: false,
       modelType: 'tensorflow',
-      notes: `TensorFlow.js neural model inference. Class index: ${maxIdx}.`,
+      notes: `TensorFlow.js neural model inference. Class index: ${maxIdx}. Latency: ${this.lastInferenceLatencyMs}ms.`,
     };
+  }
+
+  public getMemoryInfo(): { numTensors: number; numBytes: number } {
+    try {
+      const mem = tf.memory();
+      return {
+        numTensors: mem.numTensors,
+        numBytes: mem.numBytes,
+      };
+    } catch {
+      return { numTensors: 0, numBytes: 0 };
+    }
   }
 
   public dispose(): void {
@@ -152,6 +168,11 @@ export class TensorFlowISLRecognizer implements ISLRecognizer {
       this.model = null;
     }
     this.demoFallback.dispose();
+    try {
+      tf.disposeVariables();
+    } catch {
+      // ignore
+    }
     this.status = 'uninitialized';
   }
 }

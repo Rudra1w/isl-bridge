@@ -55,6 +55,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     handedness: _handedness,
     confidence,
     fps,
+    inferenceFps,
+    inferenceLatencyMs,
     isRunning,
     startCamera,
     stopCamera,
@@ -239,6 +241,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               currentPrediction={currentPrediction}
               confidence={confidence}
               fps={fps}
+              inferenceFps={inferenceFps}
+              inferenceLatencyMs={inferenceLatencyMs}
               isFallback={currentPrediction?.isFallback ?? false}
               modelStatus={
                 modelStatus === 'ready'

@@ -35,6 +35,8 @@ export interface GeminiGlossResponse {
 export class GeminiService {
   private static instance: GeminiService;
   private readonly defaultTimeoutMs = 8000;
+  private translationCache = new Map<string, GeminiGlossResponse>();
+  private inFlightRequests = new Map<string, Promise<GeminiGlossResponse>>();
 
   private constructor() {}
 
@@ -56,7 +58,7 @@ export class GeminiService {
   }
 
   /**
-   * Calls Google Gemini with retry and timeout, parsing and validating the structured JSON output.
+   * Calls Google Gemini with request deduplication and in-memory caching.
    */
   public async translateToISLGloss(
     englishText: string,
@@ -66,22 +68,42 @@ export class GeminiService {
       throw new Error('Gemini API is not configured or disabled in feature flags.');
     }
 
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.executeGeminiRequest(englishText);
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn(`[Gemini NLP] Attempt ${attempt + 1} failed:`, lastError.message);
-        if (attempt < maxRetries) {
-          // Exponential backoff before retry (500ms)
-          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
-        }
-      }
+    const key = englishText.trim().toLowerCase();
+    if (this.translationCache.has(key)) {
+      return this.translationCache.get(key)!;
     }
 
-    throw lastError || new Error('Gemini translation failed after retries.');
+    if (this.inFlightRequests.has(key)) {
+      return this.inFlightRequests.get(key)!;
+    }
+
+    const executionPromise = (async () => {
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await this.executeGeminiRequest(englishText);
+          this.translationCache.set(key, res);
+          return res;
+        } catch (err: unknown) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          console.warn(`[Gemini NLP] Attempt ${attempt + 1} failed:`, lastError.message);
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          }
+        }
+      }
+
+      throw lastError || new Error('Gemini translation failed after retries.');
+    })();
+
+    this.inFlightRequests.set(key, executionPromise);
+
+    try {
+      return await executionPromise;
+    } finally {
+      this.inFlightRequests.delete(key);
+    }
   }
 
   private async executeGeminiRequest(englishText: string): Promise<GeminiGlossResponse> {

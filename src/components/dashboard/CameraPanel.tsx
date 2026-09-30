@@ -7,6 +7,7 @@ import { formatConfidence } from '@/utils/formatters';
 import { RecognitionState, SignPrediction, HandLandmarks } from '@/types/recognition';
 import { CameraDeviceInfo } from '@/modules/camera/CameraStream';
 import { LandmarkDebugHUD } from './LandmarkDebugHUD';
+import { PerformanceIndicatorWidget } from './PerformanceIndicatorWidget';
 
 interface CameraPanelProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -21,6 +22,8 @@ interface CameraPanelProps {
   currentPrediction: SignPrediction | null;
   confidence: number;
   fps: number;
+  inferenceFps?: number;
+  inferenceLatencyMs?: number;
   isFallback: boolean;
   onStart: () => void;
   onStop: () => void;
@@ -46,6 +49,8 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
   currentPrediction,
   confidence,
   fps,
+  inferenceFps,
+  inferenceLatencyMs,
   isFallback,
   onStart,
   onStop,
@@ -304,6 +309,17 @@ export const CameraPanel: React.FC<CameraPanelProps> = ({
             confidence={confidence}
             isOpen={debugMode}
             onToggle={onToggleDebug}
+          />
+        </div>
+      )}
+
+      {/* Adaptive Hardware Telemetry & Performance Indicator */}
+      {isStreaming && (
+        <div className="px-3.5 py-1.5 bg-slate-950 border-t border-slate-800">
+          <PerformanceIndicatorWidget
+            cameraFps={fps}
+            inferenceFps={inferenceFps}
+            inferenceLatencyMs={inferenceLatencyMs}
           />
         </div>
       )}

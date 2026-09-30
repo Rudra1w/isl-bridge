@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Sliders, Volume2, Video, Eye, EyeOff, RotateCcw, Check, Sparkles } from 'lucide-react';
-import { configManager } from '@/config/appConfig';
-import { AppConfig } from '@/types/config';
+import { X, Key, Sliders, Volume2, Video, Eye, EyeOff, RotateCcw, Check, Sparkles, Zap } from 'lucide-react';
+import { configManager, PERFORMANCE_PROFILES } from '@/config/appConfig';
+import { AppConfig, PerformanceMode } from '@/types/config';
 import { SUPPORTED_LOCALES } from '@/modules/speech/SpeechRecognitionEngine';
 
 interface SettingsModalProps {
@@ -265,6 +265,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   className="w-full accent-indigo-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Hardware & Performance Optimization Profile */}
+          <div className="pt-2 border-t border-slate-800">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              Hardware Optimization & Performance Mode
+            </h3>
+            <p className="text-xs text-slate-400 mb-3">
+              Adaptive throttle for low-cost laptops with integrated graphics. Low mode reduces resolution, drops frame overhead, and disables visual effects.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {[
+                { id: 'high', label: 'High Quality', desc: '640x480 • 30 FPS inference • full skeletal effects' },
+                { id: 'balanced', label: 'Balanced (Recommended)', desc: '640x480 • 15 FPS inference • standard animations' },
+                { id: 'low', label: 'Low Hardware', desc: '480x360 • 10 FPS • frame skipping & lightweight effects' },
+              ].map((p) => {
+                const isSelected = config.performance?.mode === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      const mode = p.id as PerformanceMode;
+                      setConfig({
+                        ...config,
+                        vision: { ...config.vision, performanceMode: mode },
+                        performance: PERFORMANCE_PROFILES[mode],
+                      });
+                    }}
+                    className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-indigo-600/20 border-indigo-500 ring-2 ring-indigo-500/30'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-slate-100">{p.label}</span>
+                    <span className="text-[10px] text-slate-400 mt-1 leading-snug">{p.desc}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

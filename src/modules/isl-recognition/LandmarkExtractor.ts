@@ -142,6 +142,8 @@ export class LandmarkExtractor {
     };
   }
 
+  public lastInferenceLatencyMs = 0;
+
   /**
    * Processes a video frame and extracts 21 3D landmarks for up to 2 hands.
    */
@@ -160,7 +162,10 @@ export class LandmarkExtractor {
     this.lastVideoTime = videoElement.currentTime;
 
     try {
+      const t0 = performance.now();
       const results = this.handLandmarker.detectForVideo(videoElement, now);
+      this.lastInferenceLatencyMs = Math.round(performance.now() - t0);
+
       if (!results.landmarks || results.landmarks.length === 0) {
         return [];
       }
@@ -203,7 +208,8 @@ export class LandmarkExtractor {
     hands: HandLandmarks[],
     width: number,
     height: number,
-    drawBoundingBox = true
+    drawBoundingBox = true,
+    renderEffects = true
   ): void {
     ctx.clearRect(0, 0, width, height);
 
@@ -212,8 +218,8 @@ export class LandmarkExtractor {
       const primaryColor = isRight ? '#6366f1' : '#10b981'; // Indigo for Right, Emerald for Left
       const boneColor = isRight ? 'rgba(99, 102, 241, 0.75)' : 'rgba(16, 185, 129, 0.75)';
 
-      // 1. Draw Bounding Box and Handedness Label
-      if (drawBoundingBox && hand.boundingBox) {
+      // 1. Draw Bounding Box and Handedness Label (only if effects enabled)
+      if (drawBoundingBox && renderEffects && hand.boundingBox) {
         const bb = hand.boundingBox;
         const bx = bb.xMin * width;
         const by = bb.yMin * height;

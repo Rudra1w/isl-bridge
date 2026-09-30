@@ -1,3 +1,5 @@
+export type PerformanceMode = 'high' | 'balanced' | 'low';
+
 export interface FeatureFlags {
   enableGemini: boolean;
   enableSpeechRecognition: boolean;
@@ -9,6 +11,16 @@ export interface VisionConfig {
   targetFps: number;
   confidenceThreshold: number;
   maxHands: number;
+  performanceMode: PerformanceMode;
+}
+
+export interface PerformanceConfig {
+  mode: PerformanceMode;
+  cameraWidth: number;
+  cameraHeight: number;
+  inferenceThrottleMs: number;
+  renderLandmarkEffects: boolean;
+  enableFullAnimations: boolean;
 }
 
 export interface SpeechConfig {
@@ -27,4 +39,5 @@ export interface AppConfig {
   vision: VisionConfig;
   speech: SpeechConfig;
   gemini: GeminiConfig;
+  performance: PerformanceConfig;
 }
